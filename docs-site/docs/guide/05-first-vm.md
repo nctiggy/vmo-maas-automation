@@ -27,9 +27,27 @@ spec:
     }
 ```
 
-```bash
-kubectl apply -f manifests/nad-vlan-22.yaml
-```
+=== "Manifest"
+
+    ```bash
+    kubectl apply -f manifests/nad-vlan-22.yaml
+    ```
+
+=== "Inline"
+
+    ```bash
+    kubectl apply -f - <<'EOF'
+    apiVersion: "k8s.cni.cncf.io/v1"
+    kind: NetworkAttachmentDefinition
+    metadata:
+      name: "vlan-22"
+      namespace: default
+    spec:
+      config: |-
+        {"cniVersion":"0.3.1","name":"vlan-22","type":"bridge",
+         "bridge":"br0","vlan":22,"ipam":{}}
+    EOF
+    ```
 
 !!! warning "Qualify the NAD reference across namespaces"
     The NAD lives in `default`, but VMs live in tenant namespaces. An unqualified

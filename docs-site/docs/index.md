@@ -11,6 +11,9 @@ tenant's resource pool.
 
 Nobody typed a MAC address, created a BMC, or clicked *Commission*.
 
+[:material-github: **Everything here is on GitHub**](https://github.com/nctiggy/vmo-maas-automation){ .md-button }
+— manifests, both scripts, the exported cluster profiles and this site.
+
 That matters because MaaS is built to manage *physical* servers. It expects a machine to PXE boot,
 to have a BMC it can power-cycle over Redfish or IPMI, and to keep the same identity across
 reboots. A KubeVirt VM has none of those things by default. This project gives it all of them.
@@ -132,5 +135,6 @@ graph TD
 - :material-rocket-launch: **[Deployment guide](guide/index.md)** — soup to nuts, from prerequisites to your first `Ready` machine.
 - :material-sitemap: **[How it works](reference/how-it-works.md)** — the mechanism in detail, with the failure modes.
 - :material-lifebuoy: **[Troubleshooting](reference/troubleshooting.md)** — the things that silently do nothing, and how to spot them.
+- :material-github: **[Source on GitHub](https://github.com/nctiggy/vmo-maas-automation)** — clone it, or lift the pieces you need.
 
 </div>

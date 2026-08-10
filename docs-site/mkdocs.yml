@@ -1,6 +1,9 @@
 site_name: MaaS-managed KubeVirt VMs
 site_description: Make MaaS enlist, commission and deploy KubeVirt VMs exactly as it does physical servers — persistent MAC, Redfish BMC, power configuration and tenant pool, with no manual steps.
 site_url: http://127.0.0.1:8000/
+repo_url: https://github.com/nctiggy/vmo-maas-automation
+repo_name: nctiggy/vmo-maas-automation
+edit_uri: ""
 
 theme:
   name: material
@@ -33,6 +36,13 @@ theme:
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
+    - content.action.view
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nctiggy/vmo-maas-automation
+      name: Source on GitHub
 
 extra_css:
   - overrides/stylesheets/brand.css
