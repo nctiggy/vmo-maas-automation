@@ -1,5 +1,5 @@
-site_name: VM to Bare-Metal Automation
-site_description: Turn a KubeVirt VM into a MaaS-managed machine automatically — persistent MAC, Redfish BMC, power configuration, commissioning and tenant pool, with no manual steps.
+site_name: KubeVirt VMs as MaaS Machines
+site_description: Make MaaS enlist, commission and deploy KubeVirt VMs exactly as it does physical servers — persistent MAC, Redfish BMC, power configuration and tenant pool, with no manual steps.
 site_url: http://127.0.0.1:8000/
 
 theme:

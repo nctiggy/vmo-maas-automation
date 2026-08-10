@@ -1,4 +1,4 @@
-# VM to bare-metal, automatically
+# KubeVirt VMs as MaaS machines
 
 Create a KubeVirt VM. A few minutes later it is a commissioned, `Ready` machine in
 [MaaS](https://maas.io) — with working Redfish power control, named after the VM, and filed under

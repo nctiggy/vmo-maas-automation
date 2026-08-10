@@ -1,9 +1,9 @@
 ---
 title: Overview
-description: How a KubeVirt VM becomes a MaaS-managed machine with no manual steps.
+description: How MaaS comes to manage a KubeVirt VM exactly as it manages a physical server.
 ---
 
-# VM to bare-metal, automatically
+# KubeVirt VMs as MaaS machines
 
 Create a virtual machine in Kubernetes. A few minutes later it appears in **MaaS** as a
 commissioned, `Ready` machine — with working power control, the right name, and filed under its
