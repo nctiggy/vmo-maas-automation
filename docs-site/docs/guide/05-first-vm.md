@@ -1,9 +1,9 @@
 ---
-title: 6. Create your first VM
+title: 5. Create your first VM
 description: Create a VM, watch it become a Ready machine in MaaS, and know what to check at each step.
 ---
 
-# 6. Create your first VM
+# 5. Create your first VM
 
 ## Add the provisioning network
 
@@ -64,11 +64,10 @@ kubectl apply -f manifests/nad-vlan-22.yaml
       dataVolumeTemplates:
         - metadata: {name: web1-root}
           spec:
-            source: {blank: {}}
+            source: {blank: {}}          # MaaS installs the OS over the network
             storage:
-              accessModes: [ReadWriteMany]   # RWX so it can live-migrate
               resources: {requests: {storage: 40Gi}}
-              storageClassName: longhorn
+              storageClassName: <your-storageclass>
       template:
         spec:
           domain:
@@ -86,8 +85,8 @@ kubectl apply -f manifests/nad-vlan-22.yaml
             - {name: root, dataVolume: {name: web1-root}}
     ```
 
-    Note what is **not** there: no `macAddress`, no `firmware.serial`, no `volumeMode`. Those are
-    filled in for you.
+    Note what is **not** there: no `macAddress` and no `firmware.serial`. Those are filled in
+    for you.
 
     ```bash
     kubectl apply -f my-first-vm.yaml

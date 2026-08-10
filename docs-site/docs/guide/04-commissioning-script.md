@@ -1,9 +1,9 @@
 ---
-title: 5. Add the commissioning script
+title: 4. Add the commissioning script
 description: Teach MaaS to configure Redfish power for KubeVirt VMs, without touching physical hardware.
 ---
 
-# 5. Add the commissioning script
+# 4. Add the commissioning script
 
 This is the piece that breaks the chicken-and-egg problem: MaaS needs power configuration to
 commission a machine, but the thing that supplies it only runs during commissioning.
@@ -132,4 +132,4 @@ Set `STRICT_BMC_CHECK = True` if you want the opposite behaviour.
 
 ---
 
-**Next:** [Create your first VM →](06-first-vm.md)
+**Next:** [Create your first VM →](05-first-vm.md)

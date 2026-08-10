@@ -1,11 +1,16 @@
 ---
-title: 3. Deploy MaaS
+title: 2. Deploy MaaS
 description: Get MaaS serving DHCP and PXE on the provisioning VLAN.
 ---
 
-# 3. Deploy MaaS
+# 2. Deploy MaaS
 
-If you already run MaaS, you only need to confirm the two settings at the bottom of this page.
+!!! tip "Already running MaaS? Skip to the end."
+    This step exists only for people who do not have MaaS yet. If you do, jump straight to
+    [Two settings that matter](#two-settings-that-matter) — `enlist_commissioning` is the one this
+    automation depends on — and confirm DHCP is enabled on your provisioning VLAN.
+
+    Nothing else on this page changes an existing MaaS install.
 
 ## Install
 
@@ -114,4 +119,4 @@ maas admin boot-resources read | jq -r '.[].name' | sort -u
 
 ---
 
-**Next:** [Install the automation →](04-automation.md)
+**Next:** [Install the automation →](03-automation.md)

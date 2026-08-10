@@ -1,4 +1,4 @@
-# KubeVirt VMs as MaaS machines
+# MaaS-managed KubeVirt VMs
 
 Create a KubeVirt VM. A few minutes later it is a commissioned, `Ready` machine in
 [MaaS](https://maas.io) — with working Redfish power control, named after the VM, and filed under
@@ -63,10 +63,13 @@ ConfigMap.
 
 ## Before you start
 
+This assumes a working KubeVirt/VMO deployment already exists — nodes, storage and the VM
+platform are out of scope.
+
 Two prerequisites are commonly assumed and commonly absent:
 
-- **An NFS client on every node** (`nfs-common` / `nfs-utils`) if you want RWX storage and live
-  migration. Longhorn serves ReadWriteMany over NFS.
+- **A working MaaS**, serving DHCP and PXE on a provisioning VLAN your VMs can reach at layer 2.
+  VM interfaces must use `bridge` binding, not masquerade.
 - **`enlist_commissioning=true` in MaaS.** Enlistment is the only window in which the power
   configuration can be written.
 
@@ -84,7 +87,7 @@ Nothing here contains credentials. Set these first:
 
 ## Status
 
-Built and verified end to end on Palette VMO (KubeVirt v1.7.0, Longhorn 1.11.1, MaaS 3.5.13).
+Built and verified end to end on Palette VMO (KubeVirt v1.7.0) with MaaS 3.5.13.
 Both scripts, the policy and the CronJob are running in that environment.
 
 ## Licence

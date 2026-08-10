@@ -1,9 +1,12 @@
 ---
 title: 1. Prerequisites
-description: What must already exist, including two things people wrongly assume are true.
+description: What must already exist before installing the automation.
 ---
 
 # 1. Prerequisites
+
+This assumes you already have a working KubeVirt/VMO deployment — nodes, storage and networking
+are yours to run. What follows is only what *this* automation depends on.
 
 ## Cluster
 
@@ -13,7 +16,6 @@ description: What must already exist, including two things people wrongly assume
 | **Multus** CNI | Needed for bridged VM interfaces. Masquerade networking will not work — see below |
 | **kubevirtBMC** | Owns the `VirtualMachineBMC` CRD. Ships with Palette VMO; otherwise install it separately |
 | An **ingress controller** | Publishes each VM's Redfish endpoint over TLS |
-| **Shared storage** with RWX | Only needed if you want VMs to live-migrate |
 
 ## Network
 
@@ -46,38 +48,15 @@ Each VM gets a Redfish endpoint at `<vm>.<namespace>.redfish.<your-domain>`. You
     DNS server. It will fail on every Ubuntu host even when your router serves the record
     correctly, and the failure looks like a DNS outage rather than a policy decision.
 
-## The two everyone misses
+## MaaS
 
-### An NFS client on every node
+A working **MaaS** region+rack controller, serving DHCP and PXE on the provisioning VLAN.
 
-If you want RWX storage — and you do, if you want VMs to live-migrate — every node needs the NFS
-client. Longhorn serves ReadWriteMany through share-manager over NFSv4.1, and without a
-`mount.nfs` helper the mount fails and the VM never starts.
+If you do not have one yet, [step 2](02-maas.md) walks through a minimal install. If you already
+run MaaS, you only need the setting below.
 
-=== "Check"
-
-    ```bash
-    # run on every node
-    ls /sbin/mount.nfs || echo "MISSING"
-    ```
-
-=== "Ubuntu / Debian"
-
-    ```bash
-    sudo apt-get update
-    sudo apt-get install -y nfs-common
-    ```
-
-=== "RHEL / Rocky"
-
-    ```bash
-    sudo dnf install -y nfs-utils
-    ```
-
-### Enlistment commissioning turned on
-
-MaaS must be allowed to commission machines as they enlist — that is the window in which the
-power configuration gets written.
+Enlistment commissioning must be **on**. It is the only window in which the power configuration
+can be written — see [How it works](../reference/how-it-works.md).
 
 ```bash
 maas admin maas get-config name=enlist_commissioning   # must be true
@@ -90,8 +69,7 @@ maas admin maas set-config name=enlist_commissioning value=true
 |---|---|
 | Cluster admin `kubeconfig` | Installing the automation |
 | MaaS **admin API key** | The reconciler; found under your MaaS user preferences |
-| SSH to each node | Installing the NFS client |
 
 ---
 
-**Next:** [Prepare the nodes →](02-nodes.md)
+**Next:** [Deploy MaaS →](02-maas.md)

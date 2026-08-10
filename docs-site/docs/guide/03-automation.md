@@ -1,9 +1,9 @@
 ---
-title: 4. Install the automation
+title: 3. Install the automation
 description: Kyverno, KubeMacPool, the generate policy and the reconciler CronJob.
 ---
 
-# 4. Install the automation
+# 3. Install the automation
 
 Four things go on the cluster. Install them as a Palette cluster profile, or with `kubectl` — the
 objects are identical.
@@ -147,4 +147,4 @@ done: 0 changed, 0 skipped
 
 ---
 
-**Next:** [Add the commissioning script →](05-commissioning-script.md)
+**Next:** [Add the commissioning script →](04-commissioning-script.md)

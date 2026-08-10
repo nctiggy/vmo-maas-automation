@@ -51,28 +51,6 @@ maas admin node-script-result download <system_id> current-commissioning \
   filters=31-kubevirt-redfish-bmc filetype=txt
 ```
 
-### A pod or VM is stuck in `ContainerCreating` forever
-
-```
-MapVolume.MapPodDevice failed ... special device .../staging/pvc-... does not exist
-```
-
-**RWX + `volumeMode: Block`.** Longhorn serves ReadWriteMany over NFS, which cannot present a raw
-block device. The PVC binds — which is why this looks healthy — and then never attaches.
-
-Check **both** places `volumeMode` can be set; the DataVolume overrides the StorageProfile:
-
-```bash
-kubectl get storageprofile <sc> -o jsonpath='{.spec.claimPropertySets}{"\n"}'
-kubectl get dv -A -o custom-columns=NAME:.metadata.name,MODE:.spec.storage.volumeMode
-```
-
-Fix: `volumeMode: Filesystem` wherever the access mode is RWX.
-
-!!! warning "You cannot fix this by upgrading a profile"
-    DataVolume specs are immutable — `Cannot update DataVolume Spec`. The DataVolumes must be
-    deleted so they are recreated, which re-imports the images.
-
 ### A pack says Ready but is running old content
 
 After a profile version swap, a reconciler can recreate an object from its **cached** older pack
@@ -105,10 +83,6 @@ maas admin machine read <system_id> | jq -r '.boot_interface.mac_address'
 ```
 
 If they differ, KubeMacPool is not applying — check the namespace label.
-
-### `mount: bad option; ... need a /sbin/mount.<type> helper program`
-
-The NFS client is missing on that node. See [Prepare the nodes](../guide/02-nodes.md).
 
 ### Kyverno rejects the policy
 

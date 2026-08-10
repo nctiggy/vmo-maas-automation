@@ -89,7 +89,5 @@ Both are plain Python with **no dependencies beyond the standard library**.
 | interface | `bridge` on `default/vlan-22` | MaaS must see the real MAC |
 | `bootOrder` | NIC 1, disk 2 | A blank disk must netboot to enlist at all |
 | disk source | `blank` | MaaS installs the OS over the network |
-| accessModes | `ReadWriteMany` | So it can live-migrate |
 | `macAddress` | *unset* | KubeMacPool assigns it |
 | `firmware.serial` | *unset* | The Kyverno mutate rule stamps it |
-| `volumeMode` | *unset* | Inherits Filesystem from the StorageProfile |

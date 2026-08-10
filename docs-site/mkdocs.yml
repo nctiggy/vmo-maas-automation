@@ -1,4 +1,4 @@
-site_name: KubeVirt VMs as MaaS Machines
+site_name: MaaS-managed KubeVirt VMs
 site_description: Make MaaS enlist, commission and deploy KubeVirt VMs exactly as it does physical servers — persistent MAC, Redfish BMC, power configuration and tenant pool, with no manual steps.
 site_url: http://127.0.0.1:8000/
 
@@ -67,11 +67,10 @@ nav:
   - Deployment Guide:
       - guide/index.md
       - 1. Prerequisites: guide/01-prerequisites.md
-      - 2. Prepare the nodes: guide/02-nodes.md
-      - 3. Deploy MaaS: guide/03-maas.md
-      - 4. Install the automation: guide/04-automation.md
-      - 5. Add the commissioning script: guide/05-commissioning-script.md
-      - 6. Create your first VM: guide/06-first-vm.md
+      - 2. Deploy MaaS: guide/02-maas.md
+      - 3. Install the automation: guide/03-automation.md
+      - 4. Add the commissioning script: guide/04-commissioning-script.md
+      - 5. Create your first VM: guide/05-first-vm.md
   - Reference:
       - reference/index.md
       - How it works: reference/how-it-works.md

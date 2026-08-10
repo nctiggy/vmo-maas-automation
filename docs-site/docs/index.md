@@ -3,7 +3,7 @@ title: Overview
 description: How MaaS comes to manage a KubeVirt VM exactly as it manages a physical server.
 ---
 
-# KubeVirt VMs as MaaS machines
+# MaaS-managed KubeVirt VMs
 
 Create a virtual machine in Kubernetes. A few minutes later it appears in **MaaS** as a
 commissioned, `Ready` machine — with working power control, the right name, and filed under its
