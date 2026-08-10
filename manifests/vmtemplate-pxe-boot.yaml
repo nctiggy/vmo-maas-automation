@@ -1,0 +1,98 @@
+apiVersion: spectrocloud.com/v1
+kind: VmTemplate
+metadata:
+  name: pxe-boot
+spec:
+  description: >-
+    Diskless VM that network-boots from MaaS. MaaS enlists, commissions and deploys it like a
+    physical server, driving power and boot order through an automatically created Redfish BMC.
+  displayName: PXE Boot (MaaS-managed)
+  icon: https://raw.githubusercontent.com/cncf/artwork/master/projects/kubevirt/icon/color/kubevirt-icon-color.png
+  preference:
+    name: generic-linux
+
+  # Manual: this VM's power belongs to MaaS. kubevirtBMC drives power by writing
+  # spec.runStrategy directly (ResetType=On -> Always, ForceOff -> Halted), so whatever is set
+  # here is only the starting state. Manual means the VM is created powered-off and waits to be
+  # booted -- exactly like a physical server arriving in a rack. Boot it once (VMO console or its
+  # own Redfish BMC) and it PXEs, enlists in MaaS, and MaaS owns it from then on.
+  runStrategy: Manual
+
+  dataVolumeTemplates:
+    - metadata:
+        name: pxe-boot-root
+      spec:
+        source:
+          blank: {}          # no golden image -- MaaS installs the OS over the network
+        storage:
+          accessModes:
+            - ReadWriteMany  # RWX so the VM can live-migrate between nodes.
+                             # volumeMode is deliberately NOT set here: it comes from the
+                             # CDI StorageProfile, which is Filesystem. RWX on Longhorn's v1
+                             # data engine is served by share-manager over NFS, and NFS cannot
+                             # present a raw block device -- RWX + Block binds but never
+                             # attaches ("special device ... does not exist") and the pod
+                             # hangs in ContainerCreating forever.
+                             # Nodes must have nfs-common installed or the mount fails.
+          resources:
+            requests:
+              storage: 40Gi
+          storageClassName: longhorn
+  template:
+    metadata:
+      annotations:
+        descheduler.alpha.kubernetes.io/evict: 'true'
+    spec:
+      domain:
+        cpu:
+          cores: 2
+          sockets: 1
+          threads: 1
+        devices:
+          disks:
+            - name: datavolume-os
+              disk:
+                bus: virtio
+              # Boot order: NIC first, disk second.
+              #
+              # A fresh VM has a blank disk, so it MUST network-boot to be enlisted at all.
+              # Leaving the NIC permanently first is also how MaaS expects to manage bare
+              # metal: it decides, server-side, whether a PXE client gets an ephemeral image
+              # or an instruction to chain-boot local disk. So a deployed machine still
+              # PXEs, and simply falls through to the disk.
+              #
+              # This is belt-and-braces rather than load-bearing: kubevirtBMC implements the
+              # Redfish boot source override, and MaaS PATCHes
+              # {"Boot":{"BootSourceOverrideEnabled":"Once","BootSourceOverrideTarget":"Pxe"}}
+              # when it powers a machine on. Verified on this cluster -- setting the target
+              # to Hdd rewrote the VM to disk=1/nic=2 and back again for Pxe. So MaaS can
+              # and does drive boot order dynamically; these values are just a sane start.
+              bootOrder: 2
+          interfaces:
+            - name: pxe
+              bridge: {}     # bridge, not masquerade: MaaS must see the VM's real MAC on
+                             # the provisioning VLAN for DHCP/PXE and for commissioning to
+                             # match the machine it enlisted.
+              model: virtio
+              bootOrder: 1
+              # No macAddress here on purpose -- KubeMacPool assigns a persistent one at
+              # creation. A MAC that changes when the VMI is recreated breaks MaaS
+              # commissioning, because power-cycling destroys and recreates the VMI.
+        memory:
+          guest: 4Gi
+        resources:
+          limits:
+            memory: null
+          requests:
+            memory: 4Gi
+      networks:
+        - name: pxe
+          multus:
+            # Cross-namespace reference: the NAD lives in `default`, but VMs are created in
+            # tenant namespaces. An unqualified name resolves in the VM's OWN namespace and
+            # fails with "failed to locate network attachment definition <ns>/vlan-22".
+            networkName: default/vlan-22
+      volumes:
+        - name: datavolume-os
+          dataVolume:
+            name: pxe-boot-root

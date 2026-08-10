@@ -1,0 +1,227 @@
+# Auto-generate a kubevirtBMC + Redfish ingress for every VirtualMachine created in an
+# opted-in namespace, so MaaS (or any Redfish consumer) can control it with no manual steps.
+#
+# WHY A CONTROLLER/GENERATE POLICY AND NOT A MUTATING WEBHOOK:
+#   A mutating webhook can only modify the object being admitted - it cannot create the
+#   sibling Secret / VirtualMachineBMC / Ingress. Kyverno `generate` rules do exactly that,
+#   with resync (synchronize: true) and automatic cleanup when the VM is deleted. This policy
+#   uses BOTH: one `mutate` rule (to stamp identity into the VM) and three `generate` rules.
+#
+# PAIRS WITH KubeMacPool: the VM gets a persistent MAC at creation, this gives it a BMC.
+#   Together a VM created in an opted-in namespace is immediately MaaS-manageable.
+#
+# NOTE: Kyverno ships minimal RBAC. Any resource kind a policy GENERATES must be granted
+#   to the background/admission controllers via an AGGREGATED ClusterRole (labels below),
+#   otherwise policy admission fails with "requires permissions list,get for resource ...".
+#
+# ---------------------------------------------------------------------------------------
+# MULTI-TENANCY
+# ---------------------------------------------------------------------------------------
+# Namespaces OPT IN with a label rather than being hardcoded, so several teams/customers can
+# run VMs against one MaaS without colliding:
+#
+#     kubectl label ns <namespace> bmc.spectrocloud.com/autogen=enabled
+#
+# Identity is `<vm-name>.<namespace>` everywhere - the Redfish hostname AND the SMBIOS serial
+# the commissioning script reads. Two namespaces can therefore both contain a VM called
+# "web1" and they resolve to distinct BMCs:
+#     web1.team-a.redfish.craigcloud.com
+#     web1.team-b.redfish.craigcloud.com
+#
+# !! TLS CAVEAT: a wildcard cert matches exactly ONE label, so *.redfish.craigcloud.com does
+#    NOT cover web1.team-a.redfish.craigcloud.com. DNS wildcards DO match multiple labels
+#    (RFC 4592), and neither MaaS nor the commissioning script verifies the Redfish
+#    certificate, so this works as-is. If you need real cert validation, issue a per-namespace
+#    wildcard (*.team-a.redfish.…) or a SAN list, and point `secretName` at it per namespace.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:generate-kubevirtbmc
+  labels:
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+    rbac.kyverno.io/aggregate-to-admission-controller: "true"
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [bmc.kubevirt.io]
+    resources: [virtualmachinebmcs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [kubevirt.io]
+    resources: [virtualmachines, virtualmachineinstances]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: kubevirtbmc-autogen
+  annotations:
+    policies.kyverno.io/title: Auto-generate kubevirtBMC + Redfish ingress per VM
+    policies.kyverno.io/subject: VirtualMachine
+    policies.kyverno.io/description: >-
+      For every VirtualMachine created in a namespace labelled
+      bmc.spectrocloud.com/autogen=enabled, stamp the VM's identity into SMBIOS and generate
+      the BMC credential Secret, the VirtualMachineBMC (which makes kubevirtBMC spin up a
+      <vm>-virtbmc pod and Service exposing Redfish on :80 and IPMI on :623), and an nginx
+      Ingress terminating TLS at <vm>.<namespace>.redfish.craigcloud.com. MaaS forces https://
+      for Redfish, so the ingress is required - kubevirtBMC itself only serves plain HTTP.
+spec:
+  # generate rules are background operations; failures should not block VM creation
+  failurePolicy: Ignore
+  # Back-fill VMs that already existed when this policy landed. Without it, generate rules
+  # only fire on an admission event, so any VM predating the policy (or predating a cluster
+  # rebuild that reinstalls this profile) would silently never get a BMC.
+  generateExisting: true
+  rules:
+    # -----------------------------------------------------------------------------------
+    # 1. Stamp <vm>.<namespace> into the SMBIOS system serial number.
+    #
+    # This is what lets the MaaS commissioning script identify the VM. During commissioning
+    # the guest hostname is a MaaS-generated name ("famous-marten"), so hostname is useless;
+    # the serial survives into `dmidecode -s system-serial-number` inside the guest.
+    # KubeVirt otherwise defaults this to a random UUID, which carries no identity.
+    # Verified: virsh dumpxml shows <entry name='serial'>web1.team-a</entry>.
+    # -----------------------------------------------------------------------------------
+    - name: set-bmc-serial
+      match:
+        any:
+          - resources:
+              kinds: ["kubevirt.io/v1/VirtualMachine"]
+              namespaceSelector:
+                matchLabels:
+                  bmc.spectrocloud.com/autogen: enabled
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                domain:
+                  firmware:
+                    serial: "{{request.object.metadata.name}}.{{request.object.metadata.namespace}}"
+    - name: gen-bmc-secret
+      match:
+        any:
+          - resources:
+              kinds: ["kubevirt.io/v1/VirtualMachine"]
+              namespaceSelector:
+                matchLabels:
+                  bmc.spectrocloud.com/autogen: enabled
+      generate:
+        apiVersion: v1
+        kind: Secret
+        name: "{{request.object.metadata.name}}-bmc-creds"
+        namespace: "{{request.object.metadata.namespace}}"
+        synchronize: true
+        data:
+          type: Opaque
+          stringData:
+            username: admin
+            # LAB ONLY: one shared static password across every VM's BMC. Fine for a lab where
+            # the Redfish endpoints are behind an internal ingress; NOT appropriate for a
+            # customer environment, where one leaked credential exposes every VM's power
+            # control. Two production-shaped alternatives:
+            #
+            # OPTION A - per-VM random password, generated once by Kyverno.
+            #   Kyverno ships a JMESPath `random()` that takes a regex-style pattern
+            #   (documented example: random('[A-Z0-9]{8}-[A-Z0-9]{4}-...')):
+            #
+            #     password: "{{ random('[a-zA-Z0-9]{24}') }}"
+            #
+            #   Pair this with `synchronize: false` on THIS rule. Kyverno's docs describe
+            #   synchronize: true as keeping the generated resource in sync with the source --
+            #   reverting manual edits and propagating policy changes downstream. They do NOT
+            #   explicitly call out the random() interaction, so treat this as a reasoned
+            #   precaution rather than a documented warning: a value that is regenerated every
+            #   evaluation has no stable "source" to converge on, so the risk is Kyverno
+            #   rewriting the Secret with a fresh password while kubevirtBMC and MaaS still
+            #   hold the old one -- power ops then fail 401 for no visible reason.
+            #   synchronize: false generates it once and leaves it alone, which is the
+            #   behaviour you want for a credential anyway. Worth a quick test before
+            #   recommending it to a customer. (The other two rules can stay synchronize: true;
+            #   only the Secret carries state worth preserving.)
+            #
+            #   !! If you adopt Option A, the MaaS commissioning script can no longer derive
+            #      the password and auto-population breaks. See the NOTE at the bottom of
+            #      31-kubevirt-redfish-bmc.py for what to do instead.
+            #
+            # OPTION B - pull from an external secret store and never generate one at all.
+            #   Keep the password out of the policy entirely by cloning an existing Secret
+            #   (populated by External Secrets Operator / Vault) instead of using `data:`:
+            #
+            #     generate:
+            #       apiVersion: v1
+            #       kind: Secret
+            #       name: "{{request.object.metadata.name}}-bmc-creds"
+            #       namespace: "{{request.object.metadata.namespace}}"
+            #       synchronize: true
+            #       clone:
+            #         namespace: bmc-secrets     # where ESO/Vault writes the source secret
+            #         name: bmc-credential-template
+            #
+            #   This is the better answer when the customer already has a secrets platform:
+            #   rotation happens in the store, and Kyverno just distributes it.
+            password: "CHANGE-ME"          # see OPTION A / OPTION B above
+    - name: gen-vmbmc
+      match:
+        any:
+          - resources:
+              kinds: ["kubevirt.io/v1/VirtualMachine"]
+              namespaceSelector:
+                matchLabels:
+                  bmc.spectrocloud.com/autogen: enabled
+      generate:
+        apiVersion: bmc.kubevirt.io/v1beta1
+        kind: VirtualMachineBMC
+        name: "{{request.object.metadata.name}}"
+        namespace: "{{request.object.metadata.namespace}}"
+        synchronize: true
+        data:
+          spec:
+            virtualMachineRef:
+              name: "{{request.object.metadata.name}}"
+            authSecretRef:
+              name: "{{request.object.metadata.name}}-bmc-creds"
+            ipmi:
+              enabled: true
+    - name: gen-redfish-ingress
+      match:
+        any:
+          - resources:
+              kinds: ["kubevirt.io/v1/VirtualMachine"]
+              namespaceSelector:
+                matchLabels:
+                  bmc.spectrocloud.com/autogen: enabled
+      generate:
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        name: "{{request.object.metadata.name}}-redfish"
+        namespace: "{{request.object.metadata.namespace}}"
+        synchronize: true
+        data:
+          metadata:
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: HTTP
+          spec:
+            ingressClassName: nginx
+            tls:
+              - hosts: ["{{request.object.metadata.name}}.{{request.object.metadata.namespace}}.redfish.craigcloud.com"]
+                secretName: redfish-wildcard-tls
+            rules:
+              - host: "{{request.object.metadata.name}}.{{request.object.metadata.namespace}}.redfish.craigcloud.com"
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: "{{request.object.metadata.name}}-virtbmc"
+                          port:
+                            number: 80

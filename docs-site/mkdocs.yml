@@ -1,0 +1,77 @@
+site_name: VM to Bare-Metal Automation
+site_description: Turn a KubeVirt VM into a MaaS-managed machine automatically — persistent MAC, Redfish BMC, power configuration, commissioning and tenant pool, with no manual steps.
+site_url: http://127.0.0.1:8000/
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/images/spectrocloud-logo-white.svg
+  font:
+    text: Plus Jakarta Sans
+    code: JetBrains Mono
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+extra_css:
+  - overrides/stylesheets/brand.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.keys
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+
+nav:
+  - Overview: index.md
+  - Deployment Guide:
+      - guide/index.md
+      - 1. Prerequisites: guide/01-prerequisites.md
+      - 2. Prepare the nodes: guide/02-nodes.md
+      - 3. Deploy MaaS: guide/03-maas.md
+      - 4. Install the automation: guide/04-automation.md
+      - 5. Add the commissioning script: guide/05-commissioning-script.md
+      - 6. Create your first VM: guide/06-first-vm.md
+  - Reference:
+      - reference/index.md
+      - How it works: reference/how-it-works.md
+      - Components: reference/components.md
+      - Troubleshooting: reference/troubleshooting.md
+      - RA profile defects: reference/ra-defects.md

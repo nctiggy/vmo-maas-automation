@@ -1,0 +1,6 @@
+.venv/
+docs-site/site/
+__pycache__/
+*.pyc
+kc*.yaml
+*.key

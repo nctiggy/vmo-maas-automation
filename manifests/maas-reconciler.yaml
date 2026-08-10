@@ -1,0 +1,67 @@
+# MaaS reconciler: keeps MaaS machine names, resource pools and commissioning state in step
+# with the KubeVirt VMs they represent. Companion to the kubevirtbmc-autogen policy.
+#
+# Runs in-cluster (not on the MaaS host) so it is declarative, survives a MaaS rebuild, and
+# keeps the API key in a managed Secret. The script is stdlib-only against the MaaS REST API,
+# so a stock python:*-slim image works with no image build.
+#
+# The MaaS endpoint and API key come from cluster profile variables -- the key is marked
+# sensitive so it is masked in the UI and never stored in the manifest.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: maas-automation
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: maas-api
+  namespace: maas-automation
+type: Opaque
+stringData:
+  MAAS_URL: "{{ .spectro.var.maasUrl }}"
+  MAAS_API_KEY: "{{ .spectro.var.maasApiKey }}"
+  REDFISH_DOMAIN: "{{ .spectro.var.redfishDomain }}"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: maas-reconciler
+  namespace: maas-automation
+spec:
+  schedule: "*/2 * * * *"
+  # Idempotent, but two concurrent runs could both try to create the same resource pool.
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile: {type: RuntimeDefault}
+          containers:
+            - name: reconciler
+              image: python:3.12-slim
+              command: ["python3", "/app/maas-reconciler.py"]
+              envFrom:
+                - secretRef: {name: maas-api}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: ["ALL"]}
+              resources:
+                requests: {cpu: 10m, memory: 32Mi}
+                limits: {cpu: 200m, memory: 128Mi}
+              volumeMounts:
+                - {name: script, mountPath: /app, readOnly: true}
+          volumes:
+            - name: script
+              configMap: {name: maas-reconciler-script}

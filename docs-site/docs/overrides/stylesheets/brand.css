@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap');
+
+:root {
+  --md-primary-fg-color:        #1F7A78;
+  --md-primary-fg-color--light: #9EB277;
+  --md-primary-fg-color--dark:  #005B5B;
+  --md-accent-fg-color:         #B94B01;
+  --md-default-bg-color:        #F7F1ED;
+  --md-default-fg-color:        #012121;
+  --md-typeset-a-color:         #1F7A78;
+  --md-code-bg-color:           #efe9e3;
+}
+
+.md-header { background-color: #043736; }
+.md-tabs   { background-color: #005B5B; }
+.md-footer { background-color: #043736; }
+
+/* Admonitions on brand */
+.md-typeset .admonition.note,    .md-typeset details.note    { border-color: #1F7A78; }
+.md-typeset .note > .admonition-title, .md-typeset .note > summary { background-color: rgba(31,122,120,.10); }
+.md-typeset .admonition.warning, .md-typeset details.warning { border-color: #B94B01; }
+.md-typeset .warning > .admonition-title, .md-typeset .warning > summary { background-color: rgba(185,75,1,.10); }
+.md-typeset .admonition.tip,     .md-typeset details.tip     { border-color: #9EB277; }
+.md-typeset .tip > .admonition-title, .md-typeset .tip > summary { background-color: rgba(158,178,119,.14); }
+.md-typeset .admonition.danger,  .md-typeset details.danger  { border-color: #851A01; }
+.md-typeset .admonition.info,    .md-typeset details.info    { border-color: #7E5C8E; }
+.md-typeset .info > .admonition-title, .md-typeset .info > summary { background-color: rgba(126,92,142,.10); }
+
+/* Headings: light display weight, per brand */
+.md-typeset h1 { font-weight: 200; letter-spacing: -.01em; color: #043736; }
+.md-typeset h2 { font-weight: 500; color: #005B5B; }
+.md-typeset h3 { font-weight: 600; }
+
+/* Tables breathe a little */
+.md-typeset table:not([class]) th { background-color: rgba(31,122,120,.08); font-weight: 600; }
+.md-typeset table:not([class]) td { font-variant-numeric: tabular-nums; }
+
+/* The step chips used on the overview flow */
+.step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 1.2em 0; }
+.step-card { border: 1px solid rgba(31,122,120,.28); border-left: 4px solid #1F7A78; border-radius: 6px; padding: .8em 1em; background: rgba(255,255,255,.5); }
+.step-card .n { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: #1F7A78; font-weight: 600; }
+.step-card .t { font-weight: 600; margin: .25em 0 .35em; }
+.step-card .d { font-size: .8rem; opacity: .85; }
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0d1b1b;
+  --md-default-fg-color: #e6e6e6;
+  --md-code-bg-color:    #122424;
+  --md-typeset-a-color:  #9EB277;
+}
+[data-md-color-scheme="slate"] .md-typeset h1 { color: #F7F1ED; }
+[data-md-color-scheme="slate"] .md-typeset h2 { color: #9EB277; }
+[data-md-color-scheme="slate"] .step-card { background: rgba(255,255,255,.04); }

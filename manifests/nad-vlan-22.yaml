@@ -1,0 +1,18 @@
+# Provisioning VLAN for MaaS-managed VMs: DHCP, PXE/TFTP and commissioning traffic.
+# Matches the vlan-30 / vlan-untagged pattern in this pack. Lives in `default`; VMs in other
+# namespaces reference it as "default/vlan-22".
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: "vlan-22"
+  namespace: default
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "vlan-22",
+      "type": "bridge",
+      "bridge": "br0",
+      "vlan": 22,
+      "ipam": {}
+    }
