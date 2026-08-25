@@ -107,7 +107,7 @@ from subprocess import check_output, CalledProcessError
 # --- environment-specific settings -------------------------------------------
 REDFISH_DOMAIN = "redfish.craigcloud.com"   # <vm>.<this> -- matches the Kyverno-generated Ingress
 BMC_USER = "admin"
-BMC_PASS = "CHANGE-ME"                      # must match the Kyverno policy's generated Secret
+BMC_PASS = "Password#1"                     # must match the Kyverno policy's generated Secret
 NODE_ID = "1"                               # Redfish /Systems/<id>; kubevirtBMC exposes a single system
 
 # Reachability of the BMC is checked but is ADVISORY ONLY -- see the long note at

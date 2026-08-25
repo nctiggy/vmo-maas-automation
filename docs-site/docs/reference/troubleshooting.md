@@ -99,6 +99,58 @@ A VM already running must be restarted for the change to take effect -- `bootOrd
 the VMI spec, which is fixed at launch. The MAC survives the restart because KubeMacPool pinned
 it, so MaaS still recognises the machine.
 
+### The machine loops: enlist, commission, revert to New
+
+**Symptom.** The VM PXE-boots, enlists, starts commissioning, then MaaS logs
+
+```text
+Failed to query node's BMC — Aborting COMMISSIONING and reverting to NEW. Unable to power
+```
+
+and the whole cycle repeats. `maas admin machine read <sid>` shows `power_state: unknown`.
+
+**Cause.** The BMC password MaaS holds does not match the one in the VM's generated Secret.
+There are two independent copies of that password and they must agree:
+
+| Where | What sets it |
+|---|---|
+| `power_pass` on the MaaS machine | `BMC_PASS` in the **MaaS-stored** commissioning script `31-kubevirt-redfish-bmc` |
+| `<vm>-bmc-creds` Secret | the `gen-bmc-secret` rule in the Kyverno policy |
+
+The script uploaded into MaaS is a *copy*. Editing the script in this repo does not change it,
+so the two drift apart silently and every VM loops.
+
+**Check both:**
+
+```bash
+maas admin machine power-parameters <sid>                  # power_user / power_pass
+maas admin node-script download 31-kubevirt-redfish-bmc | grep '^BMC_PASS'
+kubectl -n <ns> get secret <vm>-bmc-creds -o jsonpath='{.data.password}' | base64 -d
+```
+
+**Confirm the BMC itself is healthy** before changing anything — this proves the ingress and
+the credential separately:
+
+```bash
+curl -sk https://<vm>.<ns>.redfish.craigcloud.com/redfish/v1/ | head -c 80   # ServiceRoot, no auth
+curl -sk -u admin:<pass> https://<vm>.<ns>.redfish.craigcloud.com/redfish/v1/Systems
+# "Unauthorized" here means the password is wrong, not that the BMC is broken
+```
+
+**Fix.** Make them the same. Aligning the policy to whatever the MaaS script already uses means
+MaaS needs no edit and new VMs work on first enlistment. To repair a machine already stuck:
+
+```bash
+maas admin machine update <sid> power_type=redfish \
+  power_parameters_power_user=admin \
+  power_parameters_power_pass='<the BMC secret value>' \
+  power_parameters_power_address='<vm>.<ns>.redfish.craigcloud.com' \
+  power_parameters_node_id=1
+
+maas admin machine query-power-state <sid>     # want: {"state": "on"}
+maas admin machine commission <sid>
+```
+
 ### The Redfish ingress returns 302, or someone else's page
 
 **Symptom.** `curl https://<vm>.<ns>.redfish.craigcloud.com/redfish/v1/` returns a redirect to a

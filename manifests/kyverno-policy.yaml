@@ -168,7 +168,8 @@ spec:
             #
             #   This is the better answer when the customer already has a secrets platform:
             #   rotation happens in the store, and Kyverno just distributes it.
-            password: "CHANGE-ME"          # see OPTION A / OPTION B above
+            password: "Password#1"         # MUST match BMC_PASS in the MaaS commissioning
+                                           # script (31-kubevirt-redfish-bmc). See OPTION A / B above.
     - name: gen-vmbmc
       match:
         any:
@@ -189,8 +190,11 @@ spec:
               name: "{{request.object.metadata.name}}"
             authSecretRef:
               name: "{{request.object.metadata.name}}-bmc-creds"
+            # MaaS drives these machines over Redfish (power_type=redfish), so the IPMI
+            # simulator is never used. Leaving it on exposes 623/UDP on every VM's virtbmc
+            # Service for nothing.
             ipmi:
-              enabled: true
+              enabled: false
     - name: gen-redfish-ingress
       match:
         any:

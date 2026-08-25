@@ -32,7 +32,19 @@ description: Every object this creates, and where each manifest lives.
 | Ingress | `<vm>-redfish` | Kyverno `gen-redfish-ingress` |
 | Pod + Service | `<vm>-virtbmc` | kubevirtBMC, from the VirtualMachineBMC |
 
-The virtbmc Service exposes Redfish on `80/TCP` and IPMI on `623/UDP`, in the VM's own namespace.
+The virtbmc Service exposes Redfish on `80/TCP` in the VM's own namespace.
+
+!!! note "The IPMI simulator is off"
+    `gen-vmbmc` sets `spec.ipmi.enabled: false`. MaaS drives these machines with
+    `power_type=redfish`, so the IPMI simulator is never used, and leaving it on would open
+    `623/UDP` on every VM's virtbmc Service for nothing. Turn it back on by flipping that field
+    in the policy if you have a tool that needs IPMI rather than Redfish:
+
+    ```bash
+    kubectl -n <ns> get svc <vm>-virtbmc \
+      -o jsonpath='{range .spec.ports[*]}{.name}:{.port}/{.protocol} {end}'
+    # with IPMI disabled: redfish:80/TCP
+    ```
 
 ## The MAC pool
 
