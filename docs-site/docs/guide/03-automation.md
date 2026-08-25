@@ -87,10 +87,23 @@ kyverno  oci   1.18.1      Palette Community Registry  6a7315287d84c8b6b4cb1a45 
     # 3. the policy (RBAC + ClusterPolicy)
     kubectl apply -f manifests/kyverno-policy.yaml
 
-    # 4. the reconciler
-    kubectl apply -f manifests/maas-reconciler-configmap.yaml
+    # 4. the reconciler -- the manifest first: it carries the Namespace the ConfigMap needs
     kubectl apply -f manifests/maas-reconciler.yaml
+    kubectl apply -f manifests/maas-reconciler-configmap.yaml
     ```
+
+    !!! warning "Apply `maas-reconciler.yaml` before the ConfigMap"
+        The `maas-automation` Namespace is defined in `maas-reconciler.yaml`, not in the
+        ConfigMap file. Applying the ConfigMap first on a clean cluster fails with
+        `namespaces "maas-automation" not found`, and the CronJob then runs with nothing
+        mounted at `/app`.
+
+    !!! warning "Let the Kyverno apply finish"
+        `install.yaml` carries the CRDs *and* the controllers. If the apply is interrupted the
+        admission controller crash-loops on
+        `sanity checks failed: CRD clusterpolicies.kyverno.io not found`. Re-run it with
+        `--server-side --force-conflicts`, then
+        `kubectl -n kyverno rollout restart deploy/kyverno-admission-controller`.
 
 ## Create the MaaS credential
 

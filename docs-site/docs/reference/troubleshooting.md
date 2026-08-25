@@ -63,6 +63,119 @@ kubectl get ingress -A -o custom-columns=NAME:.metadata.name,HOST:.spec.rules[0]
 
 ---
 
+### The VM never PXE-boots (VMO Launchpad template)
+
+**Symptom.** The VM powers on and drops to a boot failure or an EFI shell. It never sends a
+DHCP/PXE request, so MaaS never sees it.
+
+**Cause.** The NIC has no `bootOrder`. KubeVirt builds the boot list **only** from devices that
+carry a `bootOrder` -- a device without one is not "last", it is *excluded*. A template with
+`bootOrder: 2` on the disk and nothing on the interface therefore has a boot list of exactly one
+entry: the blank disk.
+
+The VMO Launchpad template editor does not preserve `bootOrder` on an interface, so a template
+that was correct when applied with `kubectl` can come back without it after being edited or
+recreated through the UI. **Check after any UI edit:**
+
+```bash
+kubectl get vmtemplate <template> \
+  -o jsonpath='{.spec.template.spec.domain.devices.interfaces}{"\n"}'
+# want: [{"bootOrder":1,"bridge":{},"model":"virtio","name":"pxe"}]
+```
+
+**Fix.** Put the NIC first and the disk second, on the template and on any VM already created
+from it:
+
+```bash
+kubectl patch vmtemplate <template> --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/domain/devices/interfaces/0/bootOrder","value":1}]'
+
+kubectl -n <ns> patch vm <vm> --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/domain/devices/interfaces/0/bootOrder","value":1},
+       {"op":"add","path":"/spec/template/spec/domain/devices/disks/0/bootOrder","value":2}]'
+```
+
+A VM already running must be restarted for the change to take effect -- `bootOrder` is part of
+the VMI spec, which is fixed at launch. The MAC survives the restart because KubeMacPool pinned
+it, so MaaS still recognises the machine.
+
+### The Redfish ingress returns 302, or someone else's page
+
+**Symptom.** `curl https://<vm>.<ns>.redfish.craigcloud.com/redfish/v1/` returns a redirect to a
+login page instead of the Redfish ServiceRoot, and MaaS cannot drive power.
+
+**Check the Ingress has an address at all:**
+
+```bash
+kubectl -n <ns> get ingress <vm>-redfish
+# ADDRESS empty  ->  no controller claimed it
+```
+
+Two causes, both of which leave the Ingress unclaimed and let the request fall through to a
+catch-all route (VMO Launchpad has one: `vmo-manager` matches ``PathPrefix(`/`)`` with no host,
+which is where the `/auth/login` redirect comes from):
+
+**1. Wrong ingress class.** The class in the policy must match a controller that exists.
+VMO Launchpad ships **Traefik**:
+
+```bash
+kubectl get ingressclass          # traefik, on a Launchpad cluster
+```
+
+Set `ingressClassName` in the `gen-redfish-ingress` rule accordingly. Patching the generated
+Ingress by hand does **not** stick -- Kyverno synchronises it back. Change the policy, then
+delete the Ingress so it regenerates.
+
+**2. The TLS secret does not exist.** The rule references `redfish-wildcard-tls`. If it is
+missing Traefik logs
+
+```text
+Error configuring TLS  error="secret <ns>/redfish-wildcard-tls does not exist"
+```
+
+and never builds the HTTPS router. Issue the certificate once per namespace -- a wildcard covers
+exactly one label, so it must be scoped to the namespace segment:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: redfish-wildcard
+  namespace: <ns>
+spec:
+  secretName: redfish-wildcard-tls
+  dnsNames: ["*.<ns>.redfish.craigcloud.com"]
+  issuerRef:
+    name: platform-ca-issuer      # whatever ClusterIssuer your platform provides
+    kind: ClusterIssuer
+```
+
+Confirm the whole path from the MaaS host, which is the client that matters:
+
+```bash
+curl -sk https://<vm>.<ns>.redfish.craigcloud.com/redfish/v1/ | head -c 120
+# want: {"@odata.context":"/redfish/v1/$metadata#ServiceRoot.ServiceRoot", ...
+```
+
+A `405` to a `HEAD` request is also a healthy answer -- the Redfish service wants `GET`.
+
+### The BMC rejects the credentials
+
+The policy generates `<vm>-bmc-creds` with the placeholder password `CHANGE-ME`, so
+`/redfish/v1/Systems` answers `Unauthorized` until you set a real one. Set it in the
+`gen-bmc-secret` rule before you register anything with MaaS, and use the same value in the
+machine's power configuration.
+
+### An Ingress is left behind after a VM is deleted
+
+Deleting a VM removes its Service, but the generated Ingress can remain and keep pointing at the
+gone Service. Traefik then logs `Cannot create service  error="service not found"` on every
+reconcile. Delete the orphan:
+
+```bash
+kubectl -n <ns> delete ingress <old-vm>-redfish
+```
+
 ## Ordinary failures
 
 ### The VM will not start

@@ -19,6 +19,12 @@ description: Every object this creates, and where each manifest lives.
 
 ## Per VM, generated automatically
 
+!!! note "The Ingress class must match your controller"
+    `gen-redfish-ingress` sets `ingressClassName`. VMO Launchpad ships **Traefik**; an Ingress
+    naming a class with no controller is never claimed and the Redfish endpoint is unreachable.
+    Check with `kubectl get ingressclass` and change the rule if needed -- patching the
+    generated Ingress does not stick, because Kyverno synchronises it back.
+
 | Object | Name | Created by |
 |---|---|---|
 | Secret | `<vm>-bmc-creds` | Kyverno `gen-bmc-secret` |

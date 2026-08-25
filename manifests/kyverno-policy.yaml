@@ -208,9 +208,13 @@ spec:
         data:
           metadata:
             annotations:
-              nginx.ingress.kubernetes.io/backend-protocol: HTTP
+              # Traefik routes to a plain-HTTP backend by default; virtbmc serves HTTP on :80.
+              traefik.ingress.kubernetes.io/router.entrypoints: websecure
           spec:
-            ingressClassName: nginx
+            # VMO Launchpad ships Traefik, not ingress-nginx. An Ingress asking for a class
+            # that has no controller is never claimed - it gets no address and requests fall
+            # through to whatever catch-all route exists.
+            ingressClassName: traefik
             tls:
               - hosts: ["{{request.object.metadata.name}}.{{request.object.metadata.namespace}}.redfish.craigcloud.com"]
                 secretName: redfish-wildcard-tls

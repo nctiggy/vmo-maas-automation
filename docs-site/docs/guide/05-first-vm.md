@@ -110,6 +110,20 @@ spec:
     kubectl apply -f my-first-vm.yaml
     ```
 
+!!! warning "If you built the template in the VMO Launchpad UI, check the NIC boot order"
+    The Launchpad template editor does not preserve `bootOrder` on an interface, and KubeVirt
+    boots **only** devices that have one -- so a template with `bootOrder` on the disk and none
+    on the NIC never network-boots at all.
+
+    ```bash
+    kubectl get vmtemplate <template> \
+      -o jsonpath='{.spec.template.spec.domain.devices.interfaces}{"\n"}'
+    # want: [{"bootOrder":1,"bridge":{},"model":"virtio","name":"pxe"}]
+    ```
+
+    Fix and full explanation:
+    [the VM never PXE-boots](../reference/troubleshooting.md#the-vm-never-pxe-boots-vmo-launchpad-template).
+
 ## Check the automation fired
 
 Within a few seconds:

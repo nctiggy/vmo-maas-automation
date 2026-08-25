@@ -14,7 +14,8 @@ are yours to run. What follows is only what *this* automation depends on.
 |---|---|
 | Kubernetes with **KubeVirt** | Tested against KubeVirt v1.7.0 |
 | **Multus** CNI | Needed for bridged VM interfaces. Masquerade networking will not work — see below |
-| **kubevirtBMC** | Owns the `VirtualMachineBMC` CRD. Ships with Palette VMO; otherwise install it separately |
+| **kubevirtBMC** | Owns the `VirtualMachineBMC` CRD. Bundled with some Palette VMO builds -- **check before assuming**: `kubectl get crd virtualmachinebmcs.bmc.kubevirt.io`. If it is absent, install it (see below) |
+| **cert-manager** | Required by kubevirtBMC's webhooks, and the easiest way to issue the Redfish wildcard certificate |
 | An **ingress controller** | Publishes each VM's Redfish endpoint over TLS |
 
 ## Network
@@ -62,6 +63,40 @@ can be written — see [How it works](../reference/how-it-works.md).
 maas admin maas get-config name=enlist_commissioning   # must be true
 maas admin maas set-config name=enlist_commissioning value=true
 ```
+
+## If kubevirtBMC is not bundled
+
+Some VMO builds ship it, some do not. Check first:
+
+```bash
+kubectl get crd virtualmachinebmcs.bmc.kubevirt.io
+```
+
+If that returns `NotFound`, install the upstream release. Note the project moved from
+`starbops/kubevirtbmc` to `kubevirtbmc/kubevirtbmc`; the old repo has no install asset:
+
+```bash
+kubectl apply -f https://github.com/kubevirtbmc/kubevirtbmc/releases/download/v0.9.0/kubevirtbmc-install.yaml
+kubectl -n kubevirtbmc-system rollout status deploy/kubevirtbmc-controller-manager --timeout=180s
+```
+
+It installs its webhooks with cert-manager `Certificate` objects, so cert-manager must already
+be running or the controller never becomes ready.
+
+## Which ingress controller you have
+
+The policy generates one Ingress per VM, and **an Ingress naming a class with no controller is
+never claimed** -- it sits with an empty `ADDRESS` and requests fall through to whatever
+catch-all route the cluster has. Check what you actually run:
+
+```bash
+kubectl get ingressclass
+```
+
+**VMO Launchpad ships Traefik**, not ingress-nginx. The policy in this repo now defaults to
+`traefik`; if your cluster runs something else, change `ingressClassName` in the
+`gen-redfish-ingress` rule to match. See
+[the ingress notes in troubleshooting](../reference/troubleshooting.md#the-redfish-ingress-returns-302-or-someone-elses-page).
 
 ## Access you will need
 
