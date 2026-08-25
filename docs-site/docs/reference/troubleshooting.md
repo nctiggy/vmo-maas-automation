@@ -99,6 +99,36 @@ A VM already running must be restarted for the change to take effect -- `bootOrd
 the VMI spec, which is fixed at launch. The MAC survives the restart because KubeMacPool pinned
 it, so MaaS still recognises the machine.
 
+### The machine reaches Ready then immediately PXE-boots again
+
+**Symptom.** Commissioning completes, MaaS shows `Ready`, and seconds later the machine starts
+PXE-booting over and over. `kubectl get vmi` shows the VMI is only a few seconds old on a VM
+that is many minutes old.
+
+**Cause.** The VM's `runStrategy` is `Always`. MaaS powers a machine off when commissioning
+finishes; with `Always`, KubeVirt recreates the VMI the moment it stops, so the machine powers
+itself back on and network-boots again.
+
+This is easy to cause by accident: `runStrategy: Always` is the obvious way to restart a VM
+after editing its spec (boot order, for example). Use `Halted` then `Manual` instead, or restart
+by deleting the VMI.
+
+**Fix.** Hand power back to MaaS:
+
+```bash
+kubectl -n <ns> patch vm <vm> --type=merge -p '{"spec":{"runStrategy":"Manual"}}'
+```
+
+`Manual` is what the template ships, and it is deliberate — kubevirtBMC drives power by writing
+`runStrategy` itself (`Always` for on, `Halted` for off), so anything you set by hand is
+competing with MaaS for control of the machine.
+
+!!! note "A `Ready` machine cannot be powered on from MaaS"
+    `maas admin machine power-on <sid>` answers
+    `Can't start node: it hasn't been allocated.` That is a workflow rule, not a BMC problem —
+    allocate or deploy the machine and MaaS powers it on itself. To prove power control
+    independently, use `maas admin machine query-power-state <sid>`.
+
 ### The machine loops: enlist, commission, revert to New
 
 **Symptom.** The VM PXE-boots, enlists, starts commissioning, then MaaS logs
