@@ -248,17 +248,30 @@ The policy generates `<vm>-bmc-creds` with the placeholder password `CHANGE-ME`,
 `gen-bmc-secret` rule before you register anything with MaaS, and use the same value in the
 machine's power configuration.
 
-### An Ingress is left behind after a VM is deleted
+### Objects left behind after a VM is deleted
 
-Deleting a VM removes its Service, but the generated Ingress can remain and keep pointing at the
-gone Service. Traefik then logs `Cannot create service  error="service not found"` on every
-reconcile. Delete the orphan:
+Every generated object carries an `ownerReference` back to its VirtualMachine, so Kubernetes
+garbage-collects the Secret, the VirtualMachineBMC and the Ingress when the VM goes. Nothing
+should survive a `kubectl delete vm`.
+
+If you are running a policy from before that was added, the Ingress is the one that lingers --
+kubevirtBMC removes the VirtualMachineBMC itself when the VM it references disappears, but
+nothing owns the Ingress. It then points at a Service that no longer exists and the ingress
+controller logs `Cannot create service  error="service not found"` on every reconcile. Delete
+the orphan and re-apply the current policy:
 
 ```bash
 kubectl -n <ns> delete ingress <old-vm>-redfish
+kubectl apply -f manifests/kyverno-policy.yaml
 ```
 
-## Ordinary failures
+Check ownership is in place on a live VM:
+
+```bash
+kubectl -n <ns> get ingress <vm>-redfish \
+  -o jsonpath='{.metadata.ownerReferences[0].kind}/{.metadata.ownerReferences[0].name}{"\n"}'
+# want: VirtualMachine/<vm>
+```
 
 ### The VM will not start
 

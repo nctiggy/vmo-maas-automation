@@ -121,6 +121,15 @@ spec:
         namespace: "{{request.object.metadata.namespace}}"
         synchronize: true
         data:
+          metadata:
+            # Garbage-collect with the VM (see the note on the Ingress rule below).
+            ownerReferences:
+              - apiVersion: kubevirt.io/v1
+                kind: VirtualMachine
+                name: "{{request.object.metadata.name}}"
+                uid: "{{request.object.metadata.uid}}"
+                blockOwnerDeletion: false
+                controller: false
           type: Opaque
           stringData:
             username: admin
@@ -214,6 +223,19 @@ spec:
             annotations:
               # Traefik routes to a plain-HTTP backend by default; virtbmc serves HTTP on :80.
               traefik.ingress.kubernetes.io/router.entrypoints: websecure
+            # Garbage-collect this object with the VM. kubevirtBMC removes the
+            # VirtualMachineBMC itself when the VM disappears, but nothing else does -- without
+            # an ownerReference the Ingress and Secret are left behind pointing at a Service
+            # that no longer exists, and the ingress controller logs "service not found" on
+            # every reconcile. blockOwnerDeletion is false so Kyverno needs no delete
+            # permission on the VM.
+            ownerReferences:
+              - apiVersion: kubevirt.io/v1
+                kind: VirtualMachine
+                name: "{{request.object.metadata.name}}"
+                uid: "{{request.object.metadata.uid}}"
+                blockOwnerDeletion: false
+                controller: false
           spec:
             # VMO Launchpad ships Traefik, not ingress-nginx. An Ingress asking for a class
             # that has no controller is never claimed - it gets no address and requests fall
