@@ -1,0 +1,111 @@
+# A MaaS-managed VM, applied directly with kubectl.
+#
+# WHY THIS FILE EXISTS
+# The VMO Launchpad template editor does not preserve `bootOrder` on an interface. KubeVirt
+# builds the boot list ONLY from devices that carry a bootOrder -- a NIC without one is not
+# "last", it is excluded -- so a VM built through the UI has a boot list of exactly one entry,
+# the blank disk, and never network-boots at all. Applying the VM directly avoids that.
+#
+# BEFORE YOU APPLY
+#   1. The namespace must be opted in, or Kyverno generates nothing:
+#        kubectl label ns <namespace> bmc.spectrocloud.com/autogen=enabled
+#   2. The provisioning NAD must exist (manifests/nad-vlan-22.yaml).
+#   3. A wildcard TLS cert for the namespace, or the Redfish ingress never gets an HTTPS
+#      router -- see reference/troubleshooting.md.
+#
+#   kubectl -n <namespace> apply -f example-vm.yaml
+#
+# WHAT HAPPENS NEXT
+# Kyverno stamps the SMBIOS serial and generates <vm>-bmc-creds, a VirtualMachineBMC and the
+# Redfish Ingress. kubevirtBMC starts a virtbmc pod. Boot the VM once (console or Redfish) and
+# it PXEs, enlists in MaaS, and MaaS owns its power from then on.
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: example-pxe                  # becomes the MaaS machine name <vm>-<namespace>
+  # namespace: craig-vms             # or pass -n on the command line
+spec:
+  # Manual, NOT Always. MaaS powers the machine off when commissioning finishes; with Always
+  # KubeVirt recreates the VMI immediately, so the machine powers itself back on and PXE-boots
+  # again forever. kubevirtBMC drives power by writing this field itself (Always=on,
+  # Halted=off), so anything set here by hand competes with MaaS for the machine.
+  runStrategy: Manual
+
+  preference:
+    kind: VirtualMachineClusterPreference
+    name: linux.efi
+
+  dataVolumeTemplates:
+    - metadata:
+        name: example-pxe-rootdisk
+      spec:
+        source:
+          # Clone of the empty "dummy" image. `blank: {}` also works when applying with
+          # kubectl; the clone exists because the dashboard will not offer a template whose
+          # source is blank. Either way the disk is all zeros, so there is nothing bootable on
+          # it and the VM falls through to PXE.
+          pvc:
+            name: blank-pxe
+            namespace: vmo-golden-images
+        storage:
+          resources:
+            requests:
+              storage: 50Gi
+          # CHANGE ME per cluster. This one is LINSTOR; `kubectl get sc` to see yours.
+          # RWX (from the StorageProfile) is what allows the VM to live-migrate.
+          storageClassName: linstor-lvm-hdd
+
+  template:
+    metadata:
+      annotations:
+        descheduler.alpha.kubernetes.io/evict: "true"
+    spec:
+      architecture: amd64
+      domain:
+        cpu:
+          sockets: 1
+          cores: 2
+          threads: 1
+        memory:
+          guest: 4Gi
+        firmware:
+          bootloader:
+            efi:
+              # Secure Boot off: PXE/iPXE chains are generally not signed for it, and enabling
+              # it also requires SMM on the VM.
+              secureBoot: false
+          # No `serial:` here on purpose -- the Kyverno set-bmc-serial rule stamps
+          # <vm>.<namespace>, which is the identity MaaS correlates the machine on.
+        devices:
+          disks:
+            - name: rootdisk
+              # SECOND. Only used once MaaS has installed an OS onto it.
+              bootOrder: 2
+              disk:
+                bus: virtio
+          interfaces:
+            - name: pxe
+              # FIRST. This is the line the Launchpad UI drops, and without it the VM
+              # never network-boots. Verify after any UI edit:
+              #   kubectl -n <ns> get vm <vm> \
+              #     -o jsonpath='{.spec.template.spec.domain.devices.interfaces}'
+              bootOrder: 1
+              model: virtio
+              # bridge, not masquerade: MaaS must see the VM's real MAC on the provisioning
+              # VLAN for DHCP/PXE, and for commissioning to match the machine it enlisted.
+              bridge: {}
+              # No macAddress on purpose -- KubeMacPool assigns a persistent one. A MAC that
+              # changes when the VMI is recreated makes MaaS enlist a brand-new machine on
+              # every power cycle.
+      networks:
+        - name: pxe
+          multus:
+            # Cross-namespace reference. The NAD lives in `default`; an unqualified name
+            # resolves in the VM's OWN namespace and fails with
+            # "failed to locate network attachment definition <ns>/vlan-22".
+            networkName: default/vlan-22
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: example-pxe-rootdisk

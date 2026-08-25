@@ -110,6 +110,21 @@ spec:
     kubectl apply -f my-first-vm.yaml
     ```
 
+!!! tip "Skip the UI: apply the VM directly"
+    Because the Launchpad template editor drops `bootOrder` from the interface, the most
+    reliable way to create one of these is `kubectl`. A ready-to-apply manifest with the boot
+    order, the multus attachment and the KubeMacPool/Kyverno expectations already correct is in
+    the repo at
+    [`manifests/example-vm.yaml`](https://github.com/nctiggy/vmo-maas-automation/blob/main/manifests/example-vm.yaml):
+
+    ```bash
+    kubectl label ns <namespace> bmc.spectrocloud.com/autogen=enabled   # once per namespace
+    kubectl -n <namespace> apply -f manifests/example-vm.yaml
+    ```
+
+    Change the name, the disk size and `storageClassName` to suit; leave `bootOrder`,
+    `runStrategy: Manual` and the absent `macAddress` alone.
+
 !!! warning "If you built the template in the VMO Launchpad UI, check the NIC boot order"
     The Launchpad template editor does not preserve `bootOrder` on an interface, and KubeVirt
     boots **only** devices that have one -- so a template with `bootOrder` on the disk and none
