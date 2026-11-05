@@ -1,15 +1,15 @@
 # smc: post-demo upgrade
 
-Prepared 11/5/26. Nothing here has been applied to smc. Run it after the demo.
+Prepared 11/5/26. Applied to smc 11/5/26 after the demo (no VMs were in opted-in namespaces at the time, so step 2c had nothing to regenerate). Verified with a fresh VM `mvt2` created with no `runStrategy`: the policies set `Manual`, the serial and the MAC, generated the Secret, BMC and route, and MaaS enlisted and commissioned it unattended.
 
-| Component | On smc now | After this |
+| Component | Before | After (live on smc) |
 |---|---|---|
 | kubevirtBMC | v0.11.0 (latest) | unchanged |
 | Kyverno | v1.19.2 (latest) | unchanged |
 | Kyverno policy | `ClusterPolicy kubevirtbmc-autogen` (deprecated API) | `MutatingPolicy` x2 + `GeneratingPolicy` (`kyverno-cel-policy.yaml`) |
 | KubeMacPool | v0.51.4 | v0.52.1 |
 
-Before starting, check for newer releases than the ones above:
+Before starting, check for newer releases than the ones above. GitHub's "latest" for KubeMacPool is v0.51.4 because it is a later backport; v0.52.1 is the newer minor.
 
 ```bash
 for r in kubevirtbmc/kubevirtbmc kyverno/kyverno k8snetworkplumbingwg/kubemacpool; do
