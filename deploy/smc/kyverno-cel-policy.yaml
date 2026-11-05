@@ -1,0 +1,167 @@
+# smc: the kubevirtBMC automation as Kyverno CEL policies (policies.kyverno.io/v1), replacing
+# the deprecated kyverno.io/v1 ClusterPolicy in deploy/smc/kyverno-policy.yaml.
+# Same behaviour, rule for rule:
+#   MutatingPolicy   kubevirtbmc-serial       firmware.serial = <vm>.<namespace>
+#   MutatingPolicy   kubevirtbmc-runstrategy  runStrategy Manual on CREATE (skipped if
+#                                             spec.running is set; KubeVirt rejects both)
+#   GeneratingPolicy kubevirtbmc-generate     <vm>-bmc-creds Secret, VirtualMachineBMC,
+#                                             <vm>-redfish HTTPRoute on gateway/smc
+# CHANGE-ME is replaced at apply time from maas-automation/bmc-shared-password. Never commit it.
+# Upgrade steps: deploy/smc/UPGRADE.md.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:generate-kubevirtbmc
+  labels:
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+    rbac.kyverno.io/aggregate-to-admission-controller: "true"
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [bmc.kubevirt.io]
+    resources: [virtualmachinebmcs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [kubevirt.io]
+    resources: [virtualmachines, virtualmachineinstances]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+---
+apiVersion: policies.kyverno.io/v1
+kind: MutatingPolicy
+metadata:
+  name: kubevirtbmc-serial
+spec:
+  failurePolicy: Ignore
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        bmc.spectrocloud.com/autogen: enabled
+    resourceRules:
+      - apiGroups: [kubevirt.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [virtualmachines]
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >
+          Object{
+            spec: Object.spec{
+              template: Object.spec.template{
+                spec: Object.spec.template.spec{
+                  domain: Object.spec.template.spec.domain{
+                    firmware: Object.spec.template.spec.domain.firmware{
+                      serial: object.metadata.name + "." + object.metadata.namespace
+                    }
+                  }
+                }
+              }
+            }
+          }
+---
+apiVersion: policies.kyverno.io/v1
+kind: MutatingPolicy
+metadata:
+  name: kubevirtbmc-runstrategy
+spec:
+  failurePolicy: Ignore
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        bmc.spectrocloud.com/autogen: enabled
+    resourceRules:
+      - apiGroups: [kubevirt.io]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [virtualmachines]
+  matchConditions:
+    - name: not-using-spec-running
+      expression: "!has(object.spec.running)"
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >
+          Object{
+            spec: Object.spec{
+              runStrategy: "Manual"
+            }
+          }
+---
+apiVersion: policies.kyverno.io/v1
+kind: GeneratingPolicy
+metadata:
+  name: kubevirtbmc-generate
+spec:
+  evaluation:
+    generateExisting:
+      enabled: true
+    synchronize:
+      enabled: true
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        bmc.spectrocloud.com/autogen: enabled
+    resourceRules:
+      - apiGroups: [kubevirt.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [virtualmachines]
+  variables:
+    - name: vm
+      expression: object.metadata.name
+    - name: ns
+      expression: object.metadata.namespace
+  # No ownerReferences on the generated objects. synchronize already deletes them when the VM
+  # goes; an ownerReference on top races it: GC deletes the Secret, Kyverno regenerates it
+  # from the deleted VM, GC deletes it again, every ~15 s forever (seen in kind, 11/5/26).
+  generate:
+    - template:
+        interpolate: cel
+        value: |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: (( variables.vm + "-bmc-creds" ))
+            namespace: (( variables.ns ))
+          type: Opaque
+          stringData:
+            username: admin
+            password: "CHANGE-ME"
+          ---
+          apiVersion: bmc.kubevirt.io/v1beta1
+          kind: VirtualMachineBMC
+          metadata:
+            name: (( variables.vm ))
+            namespace: (( variables.ns ))
+          spec:
+            virtualMachineRef:
+              name: (( variables.vm ))
+            authSecretRef:
+              name: (( variables.vm + "-bmc-creds" ))
+            ipmi:
+              enabled: false
+          ---
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
+          metadata:
+            name: (( variables.vm + "-redfish" ))
+            namespace: (( variables.ns ))
+          spec:
+            # https-nosni: MaaS's Redfish client sends no SNI (see deploy/smc/kyverno-policy.yaml)
+            parentRefs:
+              - {group: gateway.networking.k8s.io, kind: Gateway, name: smc, namespace: gateway, sectionName: https-nosni}
+              - {group: gateway.networking.k8s.io, kind: Gateway, name: smc, namespace: gateway, sectionName: https-smc-lab}
+            hostnames:
+              - (( variables.vm + "." + variables.ns + ".redfish.smc.lab" ))
+            rules:
+              - backendRefs:
+                  - name: (( variables.vm + "-virtbmc" ))
+                    port: 80

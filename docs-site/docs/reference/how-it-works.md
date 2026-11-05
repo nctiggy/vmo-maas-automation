@@ -120,16 +120,19 @@ the fact — would silently never get a BMC.
 
 kubevirtBMC implements more of Redfish than you might expect.
 
-**Power** is driven by writing `spec.runStrategy` directly — not through the start/stop
-subresources:
+**Power** depends on the kubevirtBMC version:
 
-| Redfish action | Effect on the VM |
-|---|---|
-| `ResetType: On` | `runStrategy: Always` — VMI created |
-| `ResetType: ForceOff` | `runStrategy: Halted` — VMI removed |
+| Redfish action | v0.9.0 | v0.11.0 (verified on smc 11/5/26) |
+|---|---|---|
+| `ResetType: On` | writes `runStrategy: Always` | start subresource; `runStrategy` stays `Manual` |
+| `ResetType: ForceOff` | writes `runStrategy: Halted` | stop subresource; `runStrategy` stays `Manual` |
 
-A consequence worth knowing: a template's `runStrategy` is only an initial value. It cannot
-"fight" MaaS, because a MaaS power-off rewrites the field itself.
+Either way the VM must be `runStrategy: Manual`. MaaS ends commissioning by shutting the
+ephemeral OS down from inside the guest; under `Always` KubeVirt restarts it within seconds and
+the machine PXE-boots forever while MaaS reports it off. The Kyverno policy's
+`set-run-strategy-manual` rule forces `Manual` on every VM created in an opted-in namespace, so a
+template that says `Always` cannot cause this. It runs on CREATE only and never overrides a later
+power change.
 
 **Boot order** works too. MaaS PATCHes the ComputerSystem on power-on:
 

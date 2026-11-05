@@ -109,6 +109,32 @@ spec:
                 domain:
                   firmware:
                     serial: "{{request.object.metadata.name}}.{{request.object.metadata.namespace}}"
+    # -----------------------------------------------------------------------------------
+    # Power belongs to MaaS. MaaS commissioning ends with the ephemeral OS powering the
+    # machine off from inside the guest; under runStrategy Always KubeVirt restarts it
+    # within seconds, so MaaS shows "off" while the VM keeps running and re-PXEing.
+    # Manual keeps a guest poweroff off; kubevirtBMC still powers it on/off for MaaS.
+    # CREATE only, so it never fights later power operations. Skipped when the VM uses
+    # the deprecated spec.running field (setting both is rejected by KubeVirt).
+    # -----------------------------------------------------------------------------------
+    - name: set-run-strategy-manual
+      match:
+        any:
+          - resources:
+              kinds: ["kubevirt.io/v1/VirtualMachine"]
+              operations: ["CREATE"]
+              namespaceSelector:
+                matchLabels:
+                  bmc.spectrocloud.com/autogen: enabled
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.running || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchStrategicMerge:
+          spec:
+            runStrategy: Manual
     - name: gen-bmc-secret
       match:
         any:

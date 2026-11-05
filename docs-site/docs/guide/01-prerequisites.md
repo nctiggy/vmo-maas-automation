@@ -76,7 +76,7 @@ If that returns `NotFound`, install the upstream release. Note the project moved
 `starbops/kubevirtbmc` to `kubevirtbmc/kubevirtbmc`; the old repo has no install asset:
 
 ```bash
-kubectl apply -f https://github.com/kubevirtbmc/kubevirtbmc/releases/download/v0.9.0/kubevirtbmc-install.yaml
+kubectl apply -f https://github.com/kubevirtbmc/kubevirtbmc/releases/download/v0.11.0/kubevirtbmc-install.yaml
 kubectl -n kubevirtbmc-system rollout status deploy/kubevirtbmc-controller-manager --timeout=180s
 ```
 

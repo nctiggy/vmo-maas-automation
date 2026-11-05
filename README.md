@@ -87,7 +87,9 @@ Nothing here contains credentials. Set these first:
 
 ## Status
 
-Built and verified end to end on Palette VMO (KubeVirt v1.7.0) with MaaS 3.5.13.
+Built and verified end to end on Palette VMO (KubeVirt v1.7.0) with MaaS 3.5.13, and on a
+kubeadm cluster (KubeVirt v1.9.1, kubevirtBMC v0.11.0, Kyverno 1.19.2) with MaaS 3.6.6 on
+11/5/26 -- see `deploy/smc/`.
 Both scripts, the policy and the CronJob are running in that environment.
 
 ## Licence

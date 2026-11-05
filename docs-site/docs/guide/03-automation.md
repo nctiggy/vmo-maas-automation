@@ -78,7 +78,7 @@ kyverno  oci   1.18.1      Palette Community Registry  6a7315287d84c8b6b4cb1a45 
     cd vmo-maas-automation
 
     # 1. Kyverno
-    kubectl apply -f https://github.com/kyverno/kyverno/releases/download/v1.13.4/install.yaml
+    kubectl apply -f https://github.com/kyverno/kyverno/releases/download/v1.19.2/install.yaml
     kubectl -n kyverno rollout status deploy --timeout=300s
 
     # 2. KubeMacPool

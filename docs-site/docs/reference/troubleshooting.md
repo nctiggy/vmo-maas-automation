@@ -119,9 +119,10 @@ by deleting the VMI.
 kubectl -n <ns> patch vm <vm> --type=merge -p '{"spec":{"runStrategy":"Manual"}}'
 ```
 
-`Manual` is what the template ships, and it is deliberate — kubevirtBMC drives power by writing
-`runStrategy` itself (`Always` for on, `Halted` for off), so anything you set by hand is
-competing with MaaS for control of the machine.
+`Manual` is what the template ships, and the Kyverno policy forces it on every new VM in an
+opted-in namespace. A VM created before that rule existed, or edited to `Always` later, still needs
+the patch above. kubevirtBMC v0.9.0 writes `Always`/`Halted` itself on power operations; v0.11.0
+uses start/stop and leaves `Manual` in place.
 
 !!! note "A `Ready` machine cannot be powered on from MaaS"
     `maas admin machine power-on <sid>` answers

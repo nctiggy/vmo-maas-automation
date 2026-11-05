@@ -122,9 +122,9 @@ graph TD
     The PXE template ships `runStrategy: Manual`, so a new VM is created powered-off — exactly
     like a physical server arriving in a rack. Boot it once and the rest is automatic.
 
-    `runStrategy` is only a starting value in any case: kubevirtBMC drives power by writing that
-    field directly (`ResetType=On` → `Always`, `ForceOff` → `Halted`), so MaaS takes ownership of
-    it from the first power operation onward.
+    The Kyverno policy forces `Manual` on every new VM in an opted-in namespace, so a guest
+    shutdown at the end of commissioning stays off. MaaS powers the VM on and off through
+    kubevirtBMC from then on.
 
 ---
 

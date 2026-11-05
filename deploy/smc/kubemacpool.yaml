@@ -1,9 +1,5 @@
-# KubeMacPool for smc. Differs from manifests/kubemacpool-v0.51.1.yaml in three ways:
-#  1. The VirtualMachine webhook is OPT-IN (namespace label
-#     mutatevirtualmachines.kubemacpool.io=allocate). Upstream ships it opt-OUT, which on a
-#     shared cluster rewrites MACs on every VM in every namespace on its next UPDATE.
-#  2. Pool is 02:4B:4D:xx:xx:xx, clear of the MACs pinned by hand on smc (02:5b:29, 02:5e:6d).
-#  3. Image pinned to v0.51.4 instead of :latest/Always.
+# KubeMacPool v0.52.1 for smc, rendered by deploy/smc/render-kubemacpool.py. Do not edit;
+# re-render. Opt-in webhooks, pool 02:4B:4D, image pinned to the tag.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -217,7 +213,7 @@ spec:
           value: 4380h0m0s
         - name: CERT_OVERLAP_INTERVAL
           value: 24h0m0s
-        image: quay.io/kubevirt/kubemacpool:v0.51.4
+        image: quay.io/kubevirt/kubemacpool:v0.52.1
         imagePullPolicy: IfNotPresent
         name: manager
         resources:
@@ -304,9 +300,7 @@ spec:
               name: kubemacpool-mac-range-config
         - name: KUBEVIRT_CLIENT_GO_SCHEME_REGISTRATION_VERSION
           value: v1
-        - name: TLS_MIN_VERSION
-          value: VersionTLS13
-        image: quay.io/kubevirt/kubemacpool:v0.51.4
+        image: quay.io/kubevirt/kubemacpool:v0.52.1
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
